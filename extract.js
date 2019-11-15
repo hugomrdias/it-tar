@@ -69,10 +69,12 @@ module.exports = options => {
 
         if (gnuLongPath) {
           header.name = gnuLongPath
+          gnuLongPath = null
         }
 
         if (gnuLongLinkPath) {
           header.linkname = gnuLongLinkPath
+          gnuLongLinkPath = null
         }
 
         if (pax) {
