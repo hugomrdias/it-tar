@@ -1,18 +1,17 @@
 {
-  "name": "tar-stream",
-  "version": "2.1.0",
-  "description": "tar-stream is a streaming tar parser and generator and nothing else. It is streams2 and operates purely using streams which means you can easily extract/parse tarballs without ever hitting the file system.",
-  "author": "Mathias Buus <mathiasbuus@gmail.com>",
+  "name": "it-tar",
+  "version": "0.0.0",
+  "description": "it-tar is a streaming tar parser (and maybe a generator in the future) and nothing else. It operates purely using async iterables which means you can easily extract/parse tarballs without ever hitting the file system.",
+  "author": "Alan Shaw",
   "dependencies": {
-    "bl": "^3.0.0",
-    "end-of-stream": "^1.4.1",
-    "fs-constants": "^1.0.0",
-    "inherits": "^2.0.3",
-    "readable-stream": "^3.1.1"
+    "bl": "^4.0.0",
+    "buffer": "^5.4.3",
+    "it-reader": "^2.0.0"
   },
   "devDependencies": {
     "concat-stream": "^2.0.0",
-    "standard": "^12.0.1",
+    "it-pipe": "^1.1.0",
+    "standard": "^14.3.1",
     "tape": "^4.9.2"
   },
   "scripts": {
@@ -36,9 +35,9 @@
     "modify"
   ],
   "bugs": {
-    "url": "https://github.com/mafintosh/tar-stream/issues"
+    "url": "https://github.com/alanshaw/it-tar/issues"
   },
-  "homepage": "https://github.com/mafintosh/tar-stream",
+  "homepage": "https://github.com/alanshaw/it-tar",
   "main": "index.js",
   "files": [
     "*.js",
@@ -50,6 +49,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mafintosh/tar-stream.git"
+    "url": "git+https://github.com/alanshaw/it-tar.git"
   }
 }

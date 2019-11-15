@@ -1,88 +1,60 @@
-# tar-stream
+# it-tar
 
-tar-stream is a streaming tar parser and generator and nothing else. It is streams2 and operates purely using streams which means you can easily extract/parse tarballs without ever hitting the file system.
+[![build status](https://secure.travis-ci.org/alanshaw/it-tar.png)](http://travis-ci.org/alanshaw/it-tar)
+[![dependencies Status](https://david-dm.org/alanshaw/it-tar/status.svg)](https://david-dm.org/alanshaw/it-tar)
+[![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
-Note that you still need to gunzip your data if you have a `.tar.gz`. We recommend using [gunzip-maybe](https://github.com/mafintosh/gunzip-maybe) in conjunction with this.
+> it-tar is a streaming tar parser (and maybe a generator in the future) and nothing else. It operates purely using async iterables which means you can easily extract/parse tarballs without ever hitting the file system.
+> Note that you still need to gunzip your data if you have a `.tar.gz`.
 
+## Install
+
+```sh
+npm install it-tar
 ```
-npm install tar-stream
-```
-
-[![build status](https://secure.travis-ci.org/mafintosh/tar-stream.png)](http://travis-ci.org/mafintosh/tar-stream)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 
 ## Usage
 
-tar-stream exposes two streams, [pack](https://github.com/mafintosh/tar-stream#packing) which creates tarballs and [extract](https://github.com/mafintosh/tar-stream#extracting) which extracts tarballs. To [modify an existing tarball](https://github.com/mafintosh/tar-stream#modifying-existing-tarballs) use both.
-
+`it-tar` currently only [extracts](#extracts) tarballs. Please send a PR to add packing!
 
 It implementes USTAR with additional support for pax extended headers. It should be compatible with all popular tar distributions out there (gnutar, bsdtar etc)
 
-## Related
+### Packing
 
-If you want to pack/unpack directories on the file system check out [tar-fs](https://github.com/mafintosh/tar-fs) which provides file system bindings to this module.
+> TBD
 
-## Packing
+### Extracting
 
-To create a pack stream use `tar.pack()` and call `pack.entry(header, [callback])` to add tar entries.
-
-``` js
-var tar = require('tar-stream')
-var pack = tar.pack() // pack is a streams2 stream
-
-// add a file called my-test.txt with the content "Hello World!"
-pack.entry({ name: 'my-test.txt' }, 'Hello World!')
-
-// add a file called my-stream-test.txt from a stream
-var entry = pack.entry({ name: 'my-stream-test.txt', size: 11 }, function(err) {
-  // the stream was added
-  // no more entries
-  pack.finalize()
-})
-
-entry.write('hello')
-entry.write(' ')
-entry.write('world')
-entry.end()
-
-// pipe the pack stream somewhere
-pack.pipe(process.stdout)
-```
-
-## Extracting
-
-To extract a stream use `tar.extract()` and listen for `extract.on('entry', (header, stream, next) )`
+To extract a stream use `tar.extract()` and pipe a [source iterable](https://gist.github.com/alanshaw/591dc7dd54e4f99338a347ef568d6ee9#source-it) to it.
 
 ``` js
-var extract = tar.extract()
+const Tar = require('it-tar')
+const pipe = require('it-pipe')
 
-extract.on('entry', function(header, stream, next) {
-  // header is the tar header
-  // stream is the content body (might be an empty stream)
-  // call next when you are done with this entry
-
-  stream.on('end', function() {
-    next() // ready for next entry
-  })
-
-  stream.resume() // just auto drain the stream
-})
-
-extract.on('finish', function() {
-  // all entries read
-})
-
-pack.pipe(extract)
+await pipe(
+  source.
+  Tar.extract(),
+  source => {
+    for await (const entry of source) {
+      // entry.header is the tar header (see below)
+      // entry.body is the content body (might be an empty stream)
+      for await (const data of entry.body) {
+        // do something with the data
+      }
+    }
+    // all entries read
+  }
+)
 ```
 
 The tar archive is streamed sequentially, meaning you **must** drain each entry's stream as you get them or else the main extract stream will receive backpressure and stop reading.
 
-## Headers
+#### Headers
 
 The header object using in `entry` should contain the following properties.
 Most of these values can be found by stat'ing a file.
 
-``` js
+```js
 {
   name: 'path/to/this/entry.txt',
   size: 1314,        // entry size. defaults to 0
@@ -101,68 +73,10 @@ Most of these values can be found by stat'ing a file.
 }
 ```
 
-## Modifying existing tarballs
+## Contribute
 
-Using tar-stream it is easy to rewrite paths / change modes etc in an existing tarball.
+Feel free to dive in! [Open an issue](https://github.com/alanshaw/it-tar/issues/new) or submit PRs.
 
-``` js
-var extract = tar.extract()
-var pack = tar.pack()
-var path = require('path')
+## License
 
-extract.on('entry', function(header, stream, callback) {
-  // let's prefix all names with 'tmp'
-  header.name = path.join('tmp', header.name)
-  // write the new entry to the pack stream
-  stream.pipe(pack.entry(header, callback))
-})
-
-extract.on('finish', function() {
-  // all entries done - lets finalize it
-  pack.finalize()
-})
-
-// pipe the old tarball to the extractor
-oldTarballStream.pipe(extract)
-
-// pipe the new tarball the another stream
-pack.pipe(newTarballStream)
-```
-
-## Saving tarball to fs
-
-
-``` js
-var fs = require('fs')
-var tar = require('tar-stream')
-
-var pack = tar.pack() // pack is a streams2 stream
-var path = 'YourTarBall.tar'
-var yourTarball = fs.createWriteStream(path)
-
-// add a file called YourFile.txt with the content "Hello World!"
-pack.entry({name: 'YourFile.txt'}, 'Hello World!', function (err) {
-  if (err) throw err
-  pack.finalize()
-})
-
-// pipe the pack stream to your file
-pack.pipe(yourTarball)
-
-yourTarball.on('close', function () {
-  console.log(path + ' has been written')
-  fs.stat(path, function(err, stats) {
-    if (err) throw err
-    console.log(stats)
-    console.log('Got file info successfully!')
-  })
-})
-```
-
-## Performance
-
-[See tar-fs for a performance comparison with node-tar](https://github.com/mafintosh/tar-fs/blob/master/README.md#performance)
-
-# License
-
-MIT
+[MIT](LICENSE)
