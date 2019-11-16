@@ -5,7 +5,7 @@ const Fs = require('fs')
 const pipe = require('it-pipe')
 const BufferList = require('bl/BufferList')
 
-var clamp = function (index, len, defaultValue) {
+const clamp = (index, len, defaultValue) => {
   if (typeof index !== 'number') return defaultValue
   index = ~~index // Coerce to integer.
   if (index >= len) return len
@@ -145,7 +145,7 @@ test('multi-file', async t => {
           const data = await concat(entry.body)
           t.same(data.toString(), 'i am file-2\n')
         } else {
-          throw new Error('expected only 2 files')
+          throw new Error('expected only 2 entries')
         }
         noEntries = true
         i++
@@ -210,7 +210,7 @@ test('chunked-multi-file', async t => {
           const data = await concat(entry.body)
           t.same(data.toString(), 'i am file-2\n')
         } else {
-          throw new Error('expected only 2 files')
+          throw new Error('expected only 2 entries')
         }
         noEntries = true
         i++
@@ -256,242 +256,243 @@ test('pax', async t => {
   t.ok(noEntries)
 })
 
-// test('types', function (t) {
-//   t.plan(3)
+test('types', async t => {
+  t.plan(3)
 
-//   var extract = tar.extract()
-//   var noEntries = false
+  let noEntries = false
 
-//   var ondir = function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'directory',
-//       mode: parseInt('755', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 0,
-//       mtime: new Date(1387580181000),
-//       type: 'directory',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
-//     stream.on('data', function () {
-//       t.ok(false)
-//     })
-//     extract.once('entry', onlink)
-//     callback()
-//   }
+  await pipe(
+    Fs.createReadStream(Fixtures.TYPES_TAR),
+    Tar.extract(),
+    async source => {
+      let i = 0
+      for await (const entry of source) {
+        if (i === 0) {
+          t.deepEqual(entry.header, {
+            name: 'directory',
+            mode: parseInt('755', 8),
+            uid: 501,
+            gid: 20,
+            size: 0,
+            mtime: new Date(1387580181000),
+            type: 'directory',
+            linkname: null,
+            uname: 'maf',
+            gname: 'staff',
+            devmajor: 0,
+            devminor: 0
+          })
 
-//   var onlink = function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'directory-link',
-//       mode: parseInt('755', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 0,
-//       mtime: new Date(1387580181000),
-//       type: 'symlink',
-//       linkname: 'directory',
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
-//     stream.on('data', function () {
-//       t.ok(false)
-//     })
-//     noEntries = true
-//     callback()
-//   }
+          for await (const _ of entry.body) { // eslint-disable-line no-unused-vars
+            t.ok(false)
+          }
+        } else if (i === 1) {
+          t.deepEqual(entry.header, {
+            name: 'directory-link',
+            mode: parseInt('755', 8),
+            uid: 501,
+            gid: 20,
+            size: 0,
+            mtime: new Date(1387580181000),
+            type: 'symlink',
+            linkname: 'directory',
+            uname: 'maf',
+            gname: 'staff',
+            devmajor: 0,
+            devminor: 0
+          })
 
-//   extract.once('entry', ondir)
+          for await (const _ of entry.body) { // eslint-disable-line no-unused-vars
+            t.ok(false)
+          }
+        } else {
+          throw new Error('expected only 2 entries')
+        }
+        noEntries = true
+        i++
+      }
+    }
+  )
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
+  t.ok(noEntries)
+})
 
-//   extract.end(fs.readFileSync(fixtures.TYPES_TAR))
-// })
+test('long-name', async t => {
+  t.plan(3)
+  let noEntries = false
 
-// test('long-name', function (t) {
-//   t.plan(3)
+  await pipe(
+    Fs.createReadStream(Fixtures.LONG_NAME_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'my/file/is/longer/than/100/characters/and/should/use/the/prefix/header/foobarbaz/foobarbaz/foobarbaz/foobarbaz/foobarbaz/foobarbaz/filename.txt',
+          mode: parseInt('644', 8),
+          uid: 501,
+          gid: 20,
+          size: 16,
+          mtime: new Date(1387580181000),
+          type: 'file',
+          linkname: null,
+          uname: 'maf',
+          gname: 'staff',
+          devmajor: 0,
+          devminor: 0
+        })
 
-//   var extract = tar.extract()
-//   var noEntries = false
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'hello long name\n')
+      }
+    }
+  )
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'my/file/is/longer/than/100/characters/and/should/use/the/prefix/header/foobarbaz/foobarbaz/foobarbaz/foobarbaz/foobarbaz/foobarbaz/filename.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 16,
-//       mtime: new Date(1387580181000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+  t.ok(noEntries)
+})
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'hello long name\n')
-//       callback()
-//     }))
-//   })
+test('unicode-bsd', async t => {
+  t.plan(3)
+  let noEntries = false
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
+  await pipe(
+    Fs.createReadStream(Fixtures.UNICODE_BSD_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'høllø.txt',
+          mode: parseInt('644', 8),
+          uid: 501,
+          gid: 20,
+          size: 4,
+          mtime: new Date(1387588646000),
+          pax: { 'SCHILY.dev': '16777217', 'SCHILY.ino': '3599143', 'SCHILY.nlink': '1', atime: '1387589077', ctime: '1387588646', path: 'høllø.txt' },
+          type: 'file',
+          linkname: null,
+          uname: 'maf',
+          gname: 'staff',
+          devmajor: 0,
+          devminor: 0
+        })
 
-//   extract.end(fs.readFileSync(fixtures.LONG_NAME_TAR))
-// })
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'hej\n')
+      }
+    }
+  )
 
-// test('unicode-bsd', function (t) { // can unpack a bsdtar unicoded tarball
-//   t.plan(3)
+  t.ok(noEntries)
+})
 
-//   var extract = tar.extract()
-//   var noEntries = false
+test('unicode', async t => {
+  t.plan(3)
+  let noEntries = false
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'høllø.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 4,
-//       mtime: new Date(1387588646000),
-//       pax: { 'SCHILY.dev': '16777217', 'SCHILY.ino': '3599143', 'SCHILY.nlink': '1', atime: '1387589077', ctime: '1387588646', path: 'høllø.txt' },
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+  await pipe(
+    Fs.createReadStream(Fixtures.UNICODE_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'høstål.txt',
+          mode: parseInt('644', 8),
+          uid: 501,
+          gid: 20,
+          size: 8,
+          mtime: new Date(1387580181000),
+          pax: { path: 'høstål.txt' },
+          type: 'file',
+          linkname: null,
+          uname: 'maf',
+          gname: 'staff',
+          devmajor: 0,
+          devminor: 0
+        })
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'hej\n')
-//       callback()
-//     }))
-//   })
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'høllø\n')
+      }
+    }
+  )
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
+  t.ok(noEntries)
+})
 
-//   extract.end(fs.readFileSync(fixtures.UNICODE_BSD_TAR))
-// })
+test('name-is-100', async t => {
+  t.plan(3)
+  let noEntries = false
 
-// test('unicode', function (t) { // can unpack a bsdtar unicoded tarball
-//   t.plan(3)
+  await pipe(
+    Fs.createReadStream(Fixtures.NAME_IS_100_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.same(entry.header.name.length, 100)
 
-//   var extract = tar.extract()
-//   var noEntries = false
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'hello\n')
+      }
+    }
+  )
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'høstål.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 8,
-//       mtime: new Date(1387580181000),
-//       pax: { path: 'høstål.txt' },
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+  t.ok(noEntries)
+})
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'høllø\n')
-//       callback()
-//     }))
-//   })
+test('invalid-file', async t => {
+  t.plan(1)
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
+  try {
+    await pipe(
+      Fs.createReadStream(Fixtures.INVALID_TGZ),
+      Tar.extract(),
+      async source => {
+        for await (const _ of source) { // eslint-disable-line no-unused-vars
+          t.ok(false)
+        }
+      }
+    )
+  } catch (err) {
+    return t.ok(!!err)
+  }
 
-//   extract.end(fs.readFileSync(fixtures.UNICODE_TAR))
-// })
+  t.ok(false)
+})
 
-// test('name-is-100', function (t) {
-//   t.plan(3)
+test('space prefixed', async t => {
+  t.plan(5)
 
-//   var extract = tar.extract()
+  await pipe(
+    Fs.createReadStream(Fixtures.SPACE_TAR_GZ),
+    Tar.extract(),
+    async source => {
+      for await (const _ of source) { // eslint-disable-line no-unused-vars
+        t.ok(true)
+      }
+    }
+  )
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.same(header.name.length, 100)
+  t.ok(true)
+})
 
-//     stream.pipe(concat(function (data) {
-//       t.same(data.toString(), 'hello\n')
-//       callback()
-//     }))
-//   })
+test('gnu long path', async t => {
+  t.plan(2)
 
-//   extract.on('finish', function () {
-//     t.ok(true)
-//   })
+  await pipe(
+    Fs.createReadStream(Fixtures.GNU_LONG_PATH),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.ok(entry.header.name.length > 100)
+      }
+    }
+  )
 
-//   extract.end(fs.readFileSync(fixtures.NAME_IS_100_TAR))
-// })
-
-// test('invalid-file', function (t) {
-//   t.plan(1)
-
-//   var extract = tar.extract()
-
-//   extract.on('error', function (err) {
-//     t.ok(!!err)
-//     extract.destroy()
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.INVALID_TGZ))
-// })
-
-// test('space prefixed', function (t) {
-//   t.plan(5)
-
-//   var extract = tar.extract()
-
-//   extract.on('entry', function (header, stream, callback) {
-//     t.ok(true)
-//     callback()
-//   })
-
-//   extract.on('finish', function () {
-//     t.ok(true)
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.SPACE_TAR_GZ))
-// })
-
-// test('gnu long path', function (t) {
-//   t.plan(2)
-
-//   var extract = tar.extract()
-
-//   extract.on('entry', function (header, stream, callback) {
-//     t.ok(header.name.length > 100)
-//     callback()
-//   })
-
-//   extract.on('finish', function () {
-//     t.ok(true)
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.GNU_LONG_PATH))
-// })
+  t.ok(true)
+})
 
 // test('base 256 uid and gid', function (t) {
 //   t.plan(2)

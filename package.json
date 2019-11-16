@@ -12,10 +12,11 @@
     "concat-stream": "^2.0.0",
     "it-pipe": "^1.1.0",
     "standard": "^14.3.1",
+    "stream-to-it": "^0.1.1",
     "tape": "^4.9.2"
   },
   "scripts": {
-    "test": "standard && tape test/extract.js test/pack.js",
+    "test": "standard && tape test/extract.js",
     "test-all": "standard && tape test/*.js"
   },
   "keywords": [
