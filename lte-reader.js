@@ -4,12 +4,12 @@ const Reader = require('it-reader')
 module.exports = function LteReader (source) {
   const reader = Reader(source)
   let overflow
-  return {
+  const lteReader = {
     [Symbol.asyncIterator] () { return this },
     next: bytes => {
       if (overflow) {
         let value
-        if (overflow.length === bytes) {
+        if (bytes == null || overflow.length === bytes) {
           value = overflow
           overflow = null
         } else if (overflow.length > bytes) {
@@ -25,16 +25,17 @@ module.exports = function LteReader (source) {
       return reader.next(bytes)
     },
     nextLte: async bytes => {
-      const { done, value } = await reader.next()
+      let { done, value } = await lteReader.next()
       if (done) return { done }
       if (value.length <= bytes) return { value }
-      if (value.shallowSlice) {
-        overflow = value.shallowSlice(bytes)
-        return { value: value.shallowSlice(0, bytes) }
+      value = value.shallowSlice ? value : new BufferList(value)
+      if (overflow) {
+        overflow.append(value.shallowSlice(bytes))
       } else {
-        overflow = new BufferList(value.slice(bytes))
-        return { value: value.slice(0, bytes) }
+        overflow = value.shallowSlice(bytes)
       }
+      return { value: value.shallowSlice(0, bytes) }
     }
   }
+  return lteReader
 }

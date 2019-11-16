@@ -156,107 +156,105 @@ test('multi-file', async t => {
   t.ok(noEntries)
 })
 
-// test('chunked-multi-file', function (t) {
-//   t.plan(5)
+test('chunked-multi-file', async t => {
+  t.plan(5)
 
-//   var extract = tar.extract()
-//   var noEntries = false
+  let noEntries = false
 
-//   var onfile1 = function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'file-1.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 12,
-//       mtime: new Date(1387580181000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+  await pipe(
+    (async function * () {
+      const b = Fs.readFileSync(Fixtures.MULTI_FILE_TAR)
 
-//     extract.on('entry', onfile2)
-//     stream.pipe(concat(function (data) {
-//       t.same(data.toString(), 'i am file-1\n')
-//       callback()
-//     }))
-//   }
+      for (let i = 0; i < b.length; i += 321) {
+        yield b.slice(i, clamp(i + 321, b.length, b.length))
+      }
+    })(),
+    Tar.extract(),
+    async source => {
+      let i = 0
+      for await (const entry of source) {
+        if (i === 0) {
+          t.deepEqual(entry.header, {
+            name: 'file-1.txt',
+            mode: parseInt('644', 8),
+            uid: 501,
+            gid: 20,
+            size: 12,
+            mtime: new Date(1387580181000),
+            type: 'file',
+            linkname: null,
+            uname: 'maf',
+            gname: 'staff',
+            devmajor: 0,
+            devminor: 0
+          })
 
-//   var onfile2 = function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'file-2.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 12,
-//       mtime: new Date(1387580181000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+          const data = await concat(entry.body)
+          t.same(data.toString(), 'i am file-1\n')
+        } else if (i === 1) {
+          t.deepEqual(entry.header, {
+            name: 'file-2.txt',
+            mode: parseInt('644', 8),
+            uid: 501,
+            gid: 20,
+            size: 12,
+            mtime: new Date(1387580181000),
+            type: 'file',
+            linkname: null,
+            uname: 'maf',
+            gname: 'staff',
+            devmajor: 0,
+            devminor: 0
+          })
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'i am file-2\n')
-//       callback()
-//     }))
-//   }
+          const data = await concat(entry.body)
+          t.same(data.toString(), 'i am file-2\n')
+        } else {
+          throw new Error('expected only 2 files')
+        }
+        noEntries = true
+        i++
+      }
+    }
+  )
 
-//   extract.once('entry', onfile1)
+  t.ok(noEntries)
+})
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
+test('pax', async t => {
+  t.plan(3)
+  let noEntries = false
 
-//   var b = fs.readFileSync(fixtures.MULTI_FILE_TAR)
-//   for (var i = 0; i < b.length; i += 321) {
-//     extract.write(b.slice(i, clamp(i + 321, b.length, b.length)))
-//   }
-//   extract.end()
-// })
+  await pipe(
+    Fs.createReadStream(Fixtures.PAX_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'pax.txt',
+          mode: parseInt('644', 8),
+          uid: 501,
+          gid: 20,
+          size: 12,
+          mtime: new Date(1387580181000),
+          type: 'file',
+          linkname: null,
+          uname: 'maf',
+          gname: 'staff',
+          devmajor: 0,
+          devminor: 0,
+          pax: { path: 'pax.txt', special: 'sauce' }
+        })
 
-// test('pax', function (t) {
-//   t.plan(3)
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'hello world\n')
+      }
+    }
+  )
 
-//   var extract = tar.extract()
-//   var noEntries = false
-
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'pax.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 12,
-//       mtime: new Date(1387580181000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0,
-//       pax: { path: 'pax.txt', special: 'sauce' }
-//     })
-
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'hello world\n')
-//       callback()
-//     }))
-//   })
-
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.PAX_TAR))
-// })
+  t.ok(noEntries)
+})
 
 // test('types', function (t) {
 //   t.plan(3)
