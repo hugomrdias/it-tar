@@ -34,7 +34,7 @@ module.exports = function LteReader (source) {
       let { done, value } = await lteReader.next()
       if (done) return { done }
       if (value.length <= bytes) return { value }
-      value = value.shallowSlice ? value : new BufferList(value)
+      value = BufferList.isBufferList(value) ? value : new BufferList(value)
       if (overflow) {
         overflow.append(value.shallowSlice(bytes))
       } else {

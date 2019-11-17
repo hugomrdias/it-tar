@@ -31,13 +31,13 @@ module.exports = options => {
           throw err
         }
 
-        const header = Headers.decode(headerBytes.slice(), options.filenameEncoding)
+        const header = Headers.decode(headerBytes, options.filenameEncoding)
         if (!header) continue
 
         if (header.type === 'gnu-long-path') {
           const { done, value: gnuLongPathBytes } = await reader.next(header.size)
           if (done) return
-          gnuLongPath = Headers.decodeLongPath(gnuLongPathBytes.slice(), options.filenameEncoding)
+          gnuLongPath = Headers.decodeLongPath(gnuLongPathBytes, options.filenameEncoding)
           await discardPadding(reader, header.size)
           continue
         }
@@ -45,7 +45,7 @@ module.exports = options => {
         if (header.type === 'gnu-long-link-path') {
           const { done, value: gnuLongLinkPathBytes } = await reader.next(header.size)
           if (done) return
-          gnuLongLinkPath = Headers.decodeLongPath(gnuLongLinkPathBytes.slice(), options.filenameEncoding)
+          gnuLongLinkPath = Headers.decodeLongPath(gnuLongLinkPathBytes, options.filenameEncoding)
           await discardPadding(reader, header.size)
           continue
         }
@@ -53,7 +53,7 @@ module.exports = options => {
         if (header.type === 'pax-global-header') {
           const { done, value: paxGlobalBytes } = await reader.next(header.size)
           if (done) return
-          paxGlobal = Headers.decodePax(paxGlobalBytes.slice(), options.filenameEncoding)
+          paxGlobal = Headers.decodePax(paxGlobalBytes, options.filenameEncoding)
           await discardPadding(reader, header.size)
           continue
         }
@@ -61,7 +61,7 @@ module.exports = options => {
         if (header.type === 'pax-header') {
           const { done, value: paxBytes } = await reader.next(header.size)
           if (done) return
-          pax = Headers.decodePax(paxBytes.slice(), options.filenameEncoding)
+          pax = Headers.decodePax(paxBytes, options.filenameEncoding)
           if (paxGlobal) pax = { ...paxGlobal, ...pax }
           await discardPadding(reader, header.size)
           continue

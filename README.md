@@ -49,6 +49,8 @@ await pipe(
 
 The tar archive is streamed sequentially, meaning you **must** drain each entry's body as you get them or else the main extract stream will receive backpressure and stop reading.
 
+Note that the body stream yields [`BufferList`](https://npm.im/bl) objects **not** `Buffer`s.
+
 #### Headers
 
 The header object using in `entry` should contain the following properties.

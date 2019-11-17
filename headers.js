@@ -1,4 +1,5 @@
 const { Buffer } = require('buffer')
+const BufferList = require('bl')
 
 // var alloc = Buffer.alloc
 
@@ -82,15 +83,15 @@ var toType = function (flag) {
 
 var indexOf = function (block, num, offset, end) {
   for (; offset < end; offset++) {
-    if (block[offset] === num) return offset
+    if (block.get(offset) === num) return offset
   }
   return end
 }
 
 var cksum = function (block) {
   var sum = 8 * 32
-  for (var i = 0; i < 148; i++) sum += block[i]
-  for (var j = 156; j < 512; j++) sum += block[j]
+  for (var i = 0; i < 148; i++) sum += block.get(i)
+  for (var j = 156; j < 512; j++) sum += block.get(j)
   return sum
 }
 
@@ -109,15 +110,15 @@ function parse256 (buf) {
   // first byte MUST be either 80 or FF
   // 80 for positive, FF for 2's comp
   var positive
-  if (buf[0] === 0x80) positive = true
-  else if (buf[0] === 0xFF) positive = false
+  if (buf.get(0) === 0x80) positive = true
+  else if (buf.get(0) === 0xFF) positive = false
   else return null
 
   // build up a base-256 tuple from the least sig to the highest
   var zero = false
   var tuple = []
   for (var i = buf.length - 1; i > 0; i--) {
-    var byte = buf[i]
+    var byte = buf.get(i)
     if (positive) tuple.push(byte)
     else if (zero && byte === 0) tuple.push(0)
     else if (zero) {
@@ -136,66 +137,68 @@ function parse256 (buf) {
 }
 
 var decodeOct = function (val, offset, length) {
-  val = val.slice(offset, offset + length)
+  val = val.shallowSlice(offset, offset + length)
   offset = 0
 
   // If prefixed with 0x80 then parse as a base-256 integer
-  if (val[offset] & 0x80) {
+  if (val.get(offset) & 0x80) {
     return parse256(val)
   } else {
     // Older versions of tar can prefix with spaces
-    while (offset < val.length && val[offset] === 32) offset++
+    while (offset < val.length && val.get(offset) === 32) offset++
     var end = clamp(indexOf(val, 32, offset, val.length), val.length, val.length)
-    while (offset < end && val[offset] === 0) offset++
+    while (offset < end && val.get(offset) === 0) offset++
     if (end === offset) return 0
-    return parseInt(val.slice(offset, end).toString(), 8)
+    return parseInt(val.shallowSlice(offset, end).toString(), 8)
   }
 }
 
 var decodeStr = function (val, offset, length, encoding) {
-  return val.slice(offset, indexOf(val, 0, offset, offset + length)).toString(encoding)
+  return val.shallowSlice(offset, indexOf(val, 0, offset, offset + length)).toString(encoding)
 }
 
-var addLength = function (str) {
-  var len = Buffer.byteLength(str)
-  var digits = Math.floor(Math.log(len) / Math.log(10)) + 1
-  if (len + digits >= Math.pow(10, digits)) digits++
+// var addLength = function (str) {
+//   var len = Buffer.byteLength(str)
+//   var digits = Math.floor(Math.log(len) / Math.log(10)) + 1
+//   if (len + digits >= Math.pow(10, digits)) digits++
 
-  return (len + digits) + str
-}
+//   return (len + digits) + str
+// }
 
 exports.decodeLongPath = function (buf, encoding) {
+  buf = BufferList.isBufferList(buf) ? buf : new BufferList(buf)
   return decodeStr(buf, 0, buf.length, encoding)
 }
 
-exports.encodePax = function (opts) { // TODO: encode more stuff in pax
-  var result = ''
-  if (opts.name) result += addLength(' path=' + opts.name + '\n')
-  if (opts.linkname) result += addLength(' linkpath=' + opts.linkname + '\n')
-  var pax = opts.pax
-  if (pax) {
-    for (var key in pax) {
-      result += addLength(' ' + key + '=' + pax[key] + '\n')
-    }
-  }
-  return Buffer.from(result)
-}
+// exports.encodePax = function (opts) { // TODO: encode more stuff in pax
+//   var result = ''
+//   if (opts.name) result += addLength(' path=' + opts.name + '\n')
+//   if (opts.linkname) result += addLength(' linkpath=' + opts.linkname + '\n')
+//   var pax = opts.pax
+//   if (pax) {
+//     for (var key in pax) {
+//       result += addLength(' ' + key + '=' + pax[key] + '\n')
+//     }
+//   }
+//   return Buffer.from(result)
+// }
 
 exports.decodePax = function (buf) {
+  buf = BufferList.isBufferList(buf) ? buf : new BufferList(buf)
   var result = {}
 
   while (buf.length) {
     var i = 0
-    while (i < buf.length && buf[i] !== 32) i++
-    var len = parseInt(buf.slice(0, i).toString(), 10)
+    while (i < buf.length && buf.get(i) !== 32) i++
+    var len = parseInt(buf.shallowSlice(0, i).toString(), 10)
     if (!len) return result
 
-    var b = buf.slice(i + 1, len - 1).toString()
+    var b = buf.shallowSlice(i + 1, len - 1).toString()
     var keyIndex = b.indexOf('=')
     if (keyIndex === -1) return result
     result[b.slice(0, keyIndex)] = b.slice(keyIndex + 1)
 
-    buf = buf.slice(len)
+    buf = buf.shallowSlice(len)
   }
 
   return result
@@ -245,7 +248,8 @@ exports.decodePax = function (buf) {
 // }
 
 exports.decode = function (buf, filenameEncoding) {
-  var typeflag = buf[156] === 0 ? 0 : buf[156] - ZERO_OFFSET
+  buf = BufferList.isBufferList(buf) ? buf : new BufferList(buf)
+  var typeflag = buf.get(156) === 0 ? 0 : buf.get(156) - ZERO_OFFSET
 
   var name = decodeStr(buf, 0, 100, filenameEncoding)
   var mode = decodeOct(buf, 100, 8)
@@ -254,7 +258,7 @@ exports.decode = function (buf, filenameEncoding) {
   var size = decodeOct(buf, 124, 12)
   var mtime = decodeOct(buf, 136, 12)
   var type = toType(typeflag)
-  var linkname = buf[157] === 0 ? null : decodeStr(buf, 157, 100, filenameEncoding)
+  var linkname = buf.get(157) === 0 ? null : decodeStr(buf, 157, 100, filenameEncoding)
   var uname = decodeStr(buf, 265, 32)
   var gname = decodeStr(buf, 297, 32)
   var devmajor = decodeOct(buf, 329, 8)
@@ -268,12 +272,12 @@ exports.decode = function (buf, filenameEncoding) {
   // valid checksum
   if (c !== decodeOct(buf, 148, 8)) throw new Error('Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?')
 
-  if (USTAR_MAGIC.compare(buf, MAGIC_OFFSET, MAGIC_OFFSET + 6) === 0) {
+  if (USTAR_MAGIC.compare(buf.slice(MAGIC_OFFSET, MAGIC_OFFSET + 6)) === 0) {
     // ustar (posix) format.
     // prepend prefix, if present.
-    if (buf[345]) name = decodeStr(buf, 345, 155, filenameEncoding) + '/' + name
-  } else if (GNU_MAGIC.compare(buf, MAGIC_OFFSET, MAGIC_OFFSET + 6) === 0 &&
-             GNU_VER.compare(buf, VERSION_OFFSET, VERSION_OFFSET + 2) === 0) {
+    if (buf.get(345)) name = decodeStr(buf, 345, 155, filenameEncoding) + '/' + name
+  } else if (GNU_MAGIC.compare(buf.slice(MAGIC_OFFSET, MAGIC_OFFSET + 6)) === 0 &&
+             GNU_VER.compare(buf.slice(VERSION_OFFSET, VERSION_OFFSET + 2)) === 0) {
     // 'gnu'/'oldgnu' format. Similar to ustar, but has support for incremental and
     // multi-volume tarballs.
   } else {
