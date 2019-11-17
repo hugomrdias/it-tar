@@ -14,11 +14,11 @@ async function discardPadding (reader, size) {
 module.exports = options => {
   options = options || {}
 
-  return source => {
-    return (async function * () {
-      const reader = LteReader(source)
-      let gnuLongPath, gnuLongLinkPath, paxGlobal, pax
+  return source => (async function * () {
+    const reader = LteReader(source)
+    let gnuLongPath, gnuLongLinkPath, paxGlobal, pax
 
+    try {
       while (true) {
         let headerBytes
         try {
@@ -94,7 +94,10 @@ module.exports = options => {
         const body = (async function * () {
           while (bytesRemaining) {
             const { done, value } = await reader.nextLte(bytesRemaining)
-            if (done) return
+            if (done) {
+              bytesRemaining = 0
+              return
+            }
             bytesRemaining -= value.length
             yield value
           }
@@ -109,6 +112,8 @@ module.exports = options => {
 
         await discardPadding(reader, header.size)
       }
-    })()
-  }
+    } finally {
+      await reader.return()
+    }
+  })()
 }

@@ -5,8 +5,8 @@ module.exports = function LteReader (source) {
   const reader = Reader(source)
   let overflow
   const lteReader = {
-    [Symbol.asyncIterator] () { return this },
-    next: bytes => {
+    [Symbol.asyncIterator]: () => lteReader,
+    async next (bytes) {
       if (overflow) {
         let value
         if (bytes == null || overflow.length === bytes) {
@@ -16,7 +16,7 @@ module.exports = function LteReader (source) {
           value = overflow.shallowSlice(0, bytes)
           overflow = overflow.shallowSlice(bytes)
         } else if (overflow.length < bytes) {
-          const { value: nextValue, done } = reader.next(bytes - overflow.length)
+          const { value: nextValue, done } = await reader.next(bytes - overflow.length)
           value = done ? overflow : new BufferList([overflow, nextValue])
           overflow = null
         }
@@ -24,7 +24,7 @@ module.exports = function LteReader (source) {
       }
       return reader.next(bytes)
     },
-    nextLte: async bytes => {
+    async nextLte (bytes) {
       let { done, value } = await lteReader.next()
       if (done) return { done }
       if (value.length <= bytes) return { value }
@@ -35,6 +35,9 @@ module.exports = function LteReader (source) {
         overflow = value.shallowSlice(bytes)
       }
       return { value: value.shallowSlice(0, bytes) }
+    },
+    return () {
+      return reader.return()
     }
   }
   return lteReader

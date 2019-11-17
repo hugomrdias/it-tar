@@ -494,105 +494,104 @@ test('gnu long path', async t => {
   t.ok(true)
 })
 
-// test('base 256 uid and gid', function (t) {
-//   t.plan(2)
-//   var extract = tar.extract()
+test('base 256 uid and gid', async t => {
+  t.plan(3)
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.ok(header.uid === 116435139)
-//     t.ok(header.gid === 1876110778)
-//     callback()
-//   })
+  await pipe(
+    Fs.createReadStream(Fixtures.BASE_256_UID_GID),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.ok(entry.header.uid === 116435139)
+        t.ok(entry.header.gid === 1876110778)
+      }
+    }
+  )
 
-//   extract.end(fs.readFileSync(fixtures.BASE_256_UID_GID))
-// })
+  t.ok(true)
+})
 
-// test('base 256 size', function (t) {
-//   t.plan(2)
+test('base 256 size', async t => {
+  t.plan(2)
 
-//   var extract = tar.extract()
+  await pipe(
+    Fs.createReadStream(Fixtures.BASE_256_SIZE),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'test.txt',
+          mode: parseInt('644', 8),
+          uid: 501,
+          gid: 20,
+          size: 12,
+          mtime: new Date(1387580181000),
+          type: 'file',
+          linkname: null,
+          uname: 'maf',
+          gname: 'staff',
+          devmajor: 0,
+          devminor: 0
+        })
+      }
+    }
+  )
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'test.txt',
-//       mode: parseInt('644', 8),
-//       uid: 501,
-//       gid: 20,
-//       size: 12,
-//       mtime: new Date(1387580181000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'maf',
-//       gname: 'staff',
-//       devmajor: 0,
-//       devminor: 0
-//     })
-//     callback()
-//   })
+  t.ok(true)
+})
 
-//   extract.on('finish', function () {
-//     t.ok(true)
-//   })
+test('latin-1', async t => { // can unpack filenames encoded in latin-1
+  t.plan(3)
+  let noEntries = false
 
-//   extract.end(fs.readFileSync(fixtures.BASE_256_SIZE))
-// })
+  await pipe(
+    Fs.createReadStream(Fixtures.LATIN1_TAR),
+    // This is the older name for the "latin1" encoding in Node
+    Tar.extract({ filenameEncoding: 'binary' }),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'En français, s\'il vous plaît?.txt',
+          mode: parseInt('644', 8),
+          uid: 0,
+          gid: 0,
+          size: 14,
+          mtime: new Date(1495941034000),
+          type: 'file',
+          linkname: null,
+          uname: 'root',
+          gname: 'root',
+          devmajor: 0,
+          devminor: 0
+        })
 
-// test('latin-1', function (t) { // can unpack filenames encoded in latin-1
-//   t.plan(3)
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'Hello, world!\n')
+      }
+    }
+  )
 
-//   // This is the older name for the "latin1" encoding in Node
-//   var extract = tar.extract({ filenameEncoding: 'binary' })
-//   var noEntries = false
+  t.ok(noEntries)
+})
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'En français, s\'il vous plaît?.txt',
-//       mode: parseInt('644', 8),
-//       uid: 0,
-//       gid: 0,
-//       size: 14,
-//       mtime: new Date(1495941034000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'root',
-//       gname: 'root',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+test('incomplete', async t => {
+  t.plan(2)
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'Hello, world!\n')
-//       callback()
-//     }))
-//   })
+  try {
+    await pipe(
+      Fs.createReadStream(Fixtures.INCOMPLETE_TAR),
+      Tar.extract(),
+      async source => {
+        for await (const _ of source) {} // eslint-disable-line no-unused-vars
+      }
+    )
+  } catch (err) {
+    return t.equal(err.code, 'ERR_UNDER_READ')
+  }
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.LATIN1_TAR))
-// })
-
-// test('incomplete', function (t) {
-//   t.plan(1)
-
-//   var extract = tar.extract()
-
-//   extract.on('entry', function (header, stream, callback) {
-//     callback()
-//   })
-
-//   extract.on('error', function (err) {
-//     t.same(err.message, 'Unexpected end of data')
-//   })
-
-//   extract.on('finish', function () {
-//     t.fail('should not finish')
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.INCOMPLETE_TAR))
-// })
+  t.ok(false)
+})
 
 // test('gnu', function (t) { // can correctly unpack gnu-tar format
 //   t.plan(3)
