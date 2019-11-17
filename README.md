@@ -32,12 +32,12 @@ const Tar = require('it-tar')
 const pipe = require('it-pipe')
 
 await pipe(
-  source.
+  source, // An async iterable (for example a Node.js readable stream)
   Tar.extract(),
   source => {
     for await (const entry of source) {
       // entry.header is the tar header (see below)
-      // entry.body is the content body (might be an empty stream)
+      // entry.body is the content body (might be an empty async iterable)
       for await (const data of entry.body) {
         // do something with the data
       }
@@ -47,7 +47,7 @@ await pipe(
 )
 ```
 
-The tar archive is streamed sequentially, meaning you **must** drain each entry's stream as you get them or else the main extract stream will receive backpressure and stop reading.
+The tar archive is streamed sequentially, meaning you **must** drain each entry's body as you get them or else the main extract stream will receive backpressure and stop reading.
 
 #### Headers
 
@@ -72,6 +72,11 @@ Most of these values can be found by stat'ing a file.
   devminor: 0        // device minor version. defaults to 0
 }
 ```
+
+## Related
+
+* [`it-pipe`](https://www.npmjs.com/package/it-pipe) Utility to "pipe" async iterables together
+* [`it-reader`](https://www.npmjs.com/package/it-reader) Read an exact number of bytes from a binary (async) iterable
 
 ## Contribute
 
