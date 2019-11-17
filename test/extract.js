@@ -576,7 +576,7 @@ test('latin-1', async t => { // can unpack filenames encoded in latin-1
 })
 
 test('incomplete', async t => {
-  t.plan(2)
+  t.plan(1)
 
   try {
     await pipe(
@@ -593,91 +593,94 @@ test('incomplete', async t => {
   t.ok(false)
 })
 
-// test('gnu', function (t) { // can correctly unpack gnu-tar format
-//   t.plan(3)
+test('gnu', async t => { // can correctly unpack gnu-tar format
+  t.plan(3)
+  let noEntries = false
 
-//   var extract = tar.extract()
-//   var noEntries = false
+  await pipe(
+    Fs.createReadStream(Fixtures.GNU_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'test.txt',
+          mode: parseInt('644', 8),
+          uid: 12345,
+          gid: 67890,
+          size: 14,
+          mtime: new Date(1559239869000),
+          type: 'file',
+          linkname: null,
+          uname: 'myuser',
+          gname: 'mygroup',
+          devmajor: 0,
+          devminor: 0
+        })
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'test.txt',
-//       mode: parseInt('644', 8),
-//       uid: 12345,
-//       gid: 67890,
-//       size: 14,
-//       mtime: new Date(1559239869000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'myuser',
-//       gname: 'mygroup',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'Hello, world!\n')
+      }
+    }
+  )
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'Hello, world!\n')
-//       callback()
-//     }))
-//   })
+  t.ok(noEntries)
+})
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
+test('gnu-incremental', async t => {
+  // can correctly unpack gnu-tar incremental format. In this situation,
+  // the tarball will have additional ctime and atime values in the header,
+  // and without awareness of the 'gnu' tar format, the atime (offset 345) is mistaken
+  // for a directory prefix (also offset 345).
+  t.plan(3)
+  let noEntries = false
 
-//   extract.end(fs.readFileSync(fixtures.GNU_TAR))
-// })
+  await pipe(
+    Fs.createReadStream(Fixtures.GNU_INCREMENTAL_TAR),
+    Tar.extract(),
+    async source => {
+      for await (const entry of source) {
+        t.deepEqual(entry.header, {
+          name: 'test.txt',
+          mode: parseInt('644', 8),
+          uid: 12345,
+          gid: 67890,
+          size: 14,
+          mtime: new Date(1559239869000),
+          type: 'file',
+          linkname: null,
+          uname: 'myuser',
+          gname: 'mygroup',
+          devmajor: 0,
+          devminor: 0
+        })
 
-// test('gnu-incremental', function (t) {
-//   // can correctly unpack gnu-tar incremental format. In this situation,
-//   // the tarball will have additional ctime and atime values in the header,
-//   // and without awareness of the 'gnu' tar format, the atime (offset 345) is mistaken
-//   // for a directory prefix (also offset 345).
-//   t.plan(3)
+        const data = await concat(entry.body)
+        noEntries = true
+        t.same(data.toString(), 'Hello, world!\n')
+      }
+    }
+  )
 
-//   var extract = tar.extract()
-//   var noEntries = false
+  t.ok(noEntries)
+})
 
-//   extract.on('entry', function (header, stream, callback) {
-//     t.deepEqual(header, {
-//       name: 'test.txt',
-//       mode: parseInt('644', 8),
-//       uid: 12345,
-//       gid: 67890,
-//       size: 14,
-//       mtime: new Date(1559239869000),
-//       type: 'file',
-//       linkname: null,
-//       uname: 'myuser',
-//       gname: 'mygroup',
-//       devmajor: 0,
-//       devminor: 0
-//     })
+test('v7 unsupported', async t => { // correctly fails to parse v7 tarballs
+  t.plan(1)
 
-//     stream.pipe(concat(function (data) {
-//       noEntries = true
-//       t.same(data.toString(), 'Hello, world!\n')
-//       callback()
-//     }))
-//   })
+  try {
+    await pipe(
+      Fs.createReadStream(Fixtures.V7_TAR),
+      Tar.extract(),
+      async source => {
+        for await (const _ of source) { // eslint-disable-line no-unused-vars
+          t.ok(false)
+        }
+      }
+    )
+  } catch (err) {
+    return t.ok(!!err)
+  }
 
-//   extract.on('finish', function () {
-//     t.ok(noEntries)
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.GNU_INCREMENTAL_TAR))
-// })
-
-// test('v7 unsupported', function (t) { // correctly fails to parse v7 tarballs
-//   t.plan(1)
-
-//   var extract = tar.extract()
-
-//   extract.on('error', function (err) {
-//     t.ok(!!err)
-//     extract.destroy()
-//   })
-
-//   extract.end(fs.readFileSync(fixtures.V7_TAR))
-// })
+  t.ok(false)
+})

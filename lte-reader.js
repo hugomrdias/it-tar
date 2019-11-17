@@ -17,7 +17,13 @@ module.exports = function LteReader (source) {
           overflow = overflow.shallowSlice(bytes)
         } else if (overflow.length < bytes) {
           const { value: nextValue, done } = await reader.next(bytes - overflow.length)
-          value = done ? overflow : new BufferList([overflow, nextValue])
+          if (done) {
+            throw Object.assign(
+              new Error(`stream ended before ${bytes - overflow.length} bytes became available`),
+              { code: 'ERR_UNDER_READ' }
+            )
+          }
+          value = new BufferList([overflow, nextValue])
           overflow = null
         }
         return { value }
