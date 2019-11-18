@@ -14,6 +14,7 @@ async function discardPadding (reader, size) {
 
 module.exports = options => {
   options = options || {}
+  options.highWaterMark = options.highWaterMark || 1024 * 16
 
   return source => (async function * () {
     const reader = LteReader(source)
@@ -92,9 +93,20 @@ module.exports = options => {
         }
 
         let bytesRemaining = header.size
-        const bodyPromise = defer()
+        const bodyConsumed = defer()
+
+        // Prefetch the first chunk.
+        // This allows us to stream entries for small files from the tar without
+        // explicitly streaming the body of each.
+        const firstChunk = await reader.nextLte(Math.min(bytesRemaining, options.highWaterMark))
+        bytesRemaining -= firstChunk.value.length
+
+        if (!bytesRemaining) bodyConsumed.resolve()
+
         const body = (async function * () {
           try {
+            yield firstChunk.value
+
             while (bytesRemaining) {
               const { done, value } = await reader.nextLte(bytesRemaining)
               if (done) {
@@ -104,16 +116,15 @@ module.exports = options => {
               bytesRemaining -= value.length
               yield value
             }
-          } catch (err) {
-            return bodyPromise.reject(err)
+          } finally {
+            bodyConsumed.resolve()
           }
-          bodyPromise.resolve()
         })()
 
         yield { header, body }
 
         // Wait for the body to be consumed
-        await bodyPromise.promise
+        await bodyConsumed.promise
 
         // Incase the body was not consumed entirely...
         if (bytesRemaining) {

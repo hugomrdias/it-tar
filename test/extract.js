@@ -469,9 +469,8 @@ test('space prefixed', async t => {
     Fs.createReadStream(Fixtures.SPACE_TAR_GZ),
     Tar.extract(),
     async source => {
-      for await (const entry of source) { // eslint-disable-line no-unused-vars
+      for await (const _ of source) { // eslint-disable-line no-unused-vars
         t.ok(true)
-        await concat(entry.body)
       }
     }
   )
@@ -488,7 +487,6 @@ test('gnu long path', async t => {
     async source => {
       for await (const entry of source) {
         t.ok(entry.header.name.length > 100)
-        await concat(entry.body)
       }
     }
   )
@@ -506,7 +504,6 @@ test('base 256 uid and gid', async t => {
       for await (const entry of source) {
         t.ok(entry.header.uid === 116435139)
         t.ok(entry.header.gid === 1876110778)
-        await concat(entry.body)
       }
     }
   )
@@ -587,9 +584,7 @@ test('incomplete', async t => {
       Fs.createReadStream(Fixtures.INCOMPLETE_TAR),
       Tar.extract(),
       async source => {
-        for await (const entry of source) {
-          await concat(entry.body)
-        }
+        for await (const _ of source) {} // eslint-disable-line no-unused-vars
       }
     )
   } catch (err) {
@@ -679,9 +674,8 @@ test('v7 unsupported', async t => { // correctly fails to parse v7 tarballs
       Fs.createReadStream(Fixtures.V7_TAR),
       Tar.extract(),
       async source => {
-        for await (const entry of source) {
+        for await (const _ of source) { // eslint-disable-line no-unused-vars
           t.ok(false)
-          await concat(entry.body)
         }
       }
     )
