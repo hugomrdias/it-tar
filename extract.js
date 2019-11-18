@@ -1,3 +1,4 @@
+const defer = require('p-defer')
 const Headers = require('./headers')
 const LteReader = require('./lte-reader')
 
@@ -91,19 +92,28 @@ module.exports = options => {
         }
 
         let bytesRemaining = header.size
+        const bodyPromise = defer()
         const body = (async function * () {
-          while (bytesRemaining) {
-            const { done, value } = await reader.nextLte(bytesRemaining)
-            if (done) {
-              bytesRemaining = 0
-              return
+          try {
+            while (bytesRemaining) {
+              const { done, value } = await reader.nextLte(bytesRemaining)
+              if (done) {
+                bytesRemaining = 0
+                return
+              }
+              bytesRemaining -= value.length
+              yield value
             }
-            bytesRemaining -= value.length
-            yield value
+          } catch (err) {
+            return bodyPromise.reject(err)
           }
+          bodyPromise.resolve()
         })()
 
         yield { header, body }
+
+        // Wait for the body to be consumed
+        await bodyPromise.promise
 
         // Incase the body was not consumed entirely...
         if (bytesRemaining) {
