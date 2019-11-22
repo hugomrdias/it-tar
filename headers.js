@@ -1,5 +1,5 @@
 const { Buffer } = require('buffer')
-const BufferList = require('bl')
+const BufferList = require('bl/BufferList')
 
 // var alloc = Buffer.alloc
 
