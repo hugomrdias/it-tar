@@ -41,7 +41,7 @@ await pipe(
       body: fs.createReadStream('./my-stream-test.txt')
     }
   ]
-  Tar.pack()
+  Tar.pack(),
   // pipe the pack stream somewhere
   toIterable.sink(process.stdout)
 )
