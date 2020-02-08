@@ -26,7 +26,11 @@ function getPadding (size) {
 }
 
 function encode (header) {
-  return header.pax ? encodePax(header) : Headers.encode(header)
+  if (!header.pax) {
+    const encoded = Headers.encode(header)
+    if (encoded) return encoded
+  }
+  return encodePax(header)
 }
 
 function encodePax (header) {
@@ -78,13 +82,11 @@ module.exports = () => async function * (source) {
 
     if (header.type === 'symlink' && !header.linkname) {
       header.linkname = (await concat(body)).toString()
-      const encoded = encode(header)
-      if (encoded) yield encoded
+      yield encode(header)
       continue
     }
 
-    const encoded = encode(header)
-    if (encoded) yield encoded
+    yield encode(header)
 
     if (header.type !== 'file' && header.type !== 'contiguous-file') {
       continue
